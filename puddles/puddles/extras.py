@@ -13,10 +13,17 @@ async def async_sleep_tick(i, *a, **kw):
     while 1:
         n = round(m,4)
         print(f"{os.getpid():<6}", f"{i:<3}", f"{n:<7,} ", v)
-        await sleep_loop(d)
+        await async_sleep(d)
+
+from time import sleep as time_sleep
 
 
-async def sleep_loop(timeout):
+def sync_sleep(timeout):
+    time_sleep(timeout)
+    return timeout
+
+
+async def async_sleep(timeout):
     await asyncio.sleep(timeout)
 
 
@@ -34,7 +41,7 @@ def full_wait_futures(futures):
 
 def soft_wait_futures(futures):
     res = ()
-    print('soft_wait_futures...')
+    print(f'soft_wait {len(futures)} futures...')
     for future in concurrent.futures.as_completed(futures):
         # url = futures[future]
         try:
@@ -43,8 +50,9 @@ def soft_wait_futures(futures):
             print('\ngenerated an exception: %s' % (exc))
         else:
             print('Item Complete:', future.index)
+            print('Storing', data)
             res += (data,)
-
+    print('Returning results, len', len(res))
     return futures, res
 
 
@@ -94,8 +102,9 @@ def clean_futures(futures):
 
 import time
 
-def variate(i):
-    return (i % 10) * .2 + random.random()
+def variate(i, v=.2):
+    return (i % 10) * v + random.random()
+
 
 def sleep_tick(i, *a, **kw):
     m = variate(i)

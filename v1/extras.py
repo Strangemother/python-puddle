@@ -27,7 +27,7 @@ def wait_futures(futures):
         try:
             data = future.result()
         except Exception as exc:
-            print('generated an exception: %s' % (exc))
+            print(f'{future} generated an exception: %s' % (exc))
         else:
             print(data)
 

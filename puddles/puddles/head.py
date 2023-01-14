@@ -1,10 +1,10 @@
 import os
-import metakey
-import shadow
-from inspect import iscoroutinefunction as is_async, iscoroutine as is_co
 import asyncio
 from functools import cached_property
+from inspect import iscoroutinefunction as is_async, iscoroutine as is_co
 
+from . import metakey
+from . import shadow
 
 class ProcessHead(object):
     """The ProcessHead acts as the primary for a new process, called upon
@@ -30,20 +30,27 @@ class ProcessHead(object):
         ...
 
     def add_map(self, k, v):
-        skey = metakey.skey
-        self._livemap[skey(k)] = v
+        # skey = metakey.skey
+        self._livemap[k] = v
 
     def live(self, *a, **kw):
         """The first live head"""
-        return self.run_func(*a, **kw)
+        try:
+            return self.run_func(*a, **kw)
+        except KeyboardInterrupt:
+            print('Head Kill', a, kw)
+
 
     # @cached_property
     @property
     def key_map(self):
         skey = metakey.skey
+        return {skey(x):y for x,y in self.get_clean_key_map().items()}
+
+    def get_clean_key_map(self):
         return {
-            skey('index'): self.kwargs['index'],
-            skey('head'): self,
+            'index': self.kwargs['index'],
+            'head': self,
             **self.livemap()
         }
 
@@ -52,6 +59,7 @@ class ProcessHead(object):
 
     def get_callable(self, *a, **kw):
         func = self.func
+
         if isinstance(self.func, dict):
             # unpack
             func = shadow.locate(self.func['path'])(*self.func['args'])
@@ -61,20 +69,31 @@ class ProcessHead(object):
             a  = self.func[1] if len(self.func) > 1 else a
             kw  = self.func[2] if len(self.func) > 2 else kw
 
+        kw = self.update_callable_kwargs(kw)
+        a = self.update_callable_args(a, kw)
+
         return func, a, kw
+
+    def update_callable_args(self, a, kw):
+        a += kw.pop('run_args', ())
+        return a
+
+    def update_callable_kwargs(self, kw):
+        run_kwargs = self.kwargs.copy()
+        for key in self.get_clean_key_map():
+            run_kwargs.pop(key, None)
+        kw.update(run_kwargs)
+        return kw
 
     def run_func(self, *a, **kw):
         func, fargs, fkwargs = self.get_callable(*a, **kw)
         pa, pkw = metakey.proc_process_meta(self, fargs, fkwargs)
         if is_async(func) or is_co(func):
-            return self.run_func_in_aync(func, *pa, **pkw)
+            return self.run_func_in_async(func, *pa, **pkw)
         return func(*pa, **pkw)
 
-    def run_func_in_aync(self, func, *a, **kw):
-        try:
-            return asyncio.run(func)
-        except KeyboardInterrupt:
-            print('Head Kill', a, kw)
+    def run_func_in_async(self, func, *a, **kw):
+        return asyncio.run(func(*a, **kw), debug=True)
 
 
 class InfoHead(ProcessHead):

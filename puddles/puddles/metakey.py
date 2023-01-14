@@ -1,4 +1,4 @@
-import shadow
+from . import shadow
 
 SHADOW_KEY = '__shadow.meta__'
 

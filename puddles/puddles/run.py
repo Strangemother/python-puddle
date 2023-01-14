@@ -1,7 +1,8 @@
 from inspect import iscoroutinefunction as is_async, iscoroutine as is_co
 
-import raw, asyncio, extras
-import shadow
+from . import raw, extras
+from . import shadow
+import asyncio
 import time
 
 proc = shadow.Shadow()
@@ -76,11 +77,11 @@ def head_accept(head, index=-1, **other):
 
     In this example we return the call index of the thread.
     """
-    print('head_accept', head, 'index:', index, 'other options:', other)
-    time.sleep(extras.variate(3))
+    print('head_accept', 'index:', index, 'options:', other)
+    time.sleep(extras.variate(3, .5))
     return index
 
 if __name__ == '__main__':
     res = main()
+    # res= other_main()
     print(res)
-    # other_main()
