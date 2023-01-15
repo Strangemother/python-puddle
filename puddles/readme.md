@@ -2,21 +2,76 @@
 
 > `Puddles` provdes a range of tools to simplify the execution and management of multiprocessing Pools and Processes.
 
+
 To get started install:
 
     pip install puddles
 
-And start submitting jobs to processes:
+Job done. All dependencies are built-ins.
+
+## Example
+
++ Run a async and non-async
++ with args, and kwargs
++ and iterable unpacks:
+
+```py
+import puddles
+from puddles import raw, extras
+
+
+def sync_sleep(index=-1, **other):
+    print('sync_sleep', 'index:', index, 'options:', other)
+    time.sleep(extras.variate(3, .5))
+    return index
+
+
+async def async_sleep(index=-1, **other):
+    print('async_sleep', 'index:', index, 'options:', other)
+    await asyncio.sleep(extras.variate(3, .5))
+    return index
+
+
+def generate_function_pack(func):
+    items = (
+                # # Function
+                func,
+                # # Function and args
+                (func, (2,)),
+                # # function, args, kwargs
+                (func, (3,), { 'roo': 'berry'}),
+                # # A 'unit' of all func, args, kwargs
+                raw.unit(func, 4, foo='bar'),
+                # # many units ...
+                raw.count(2, func, "5/6", elk='Ricky'),
+        )
+    return items
+
+# For fun, generate the same function signatures for sync and async
+items = generate_function_pack(async_sleep)
+items += generate_function_pack(sync_sleep)
+
+len(items) == 10
+
+# Run them all...
+result = puddles.run(items)
+print(result)
+# (4, -1, 4, '5/6', 2, 3, '5/6', -1, 2, '5/6', '5/6', 3)
+```
+
+And you're good to go. As all `items` standard Futures, all builtins and functionality should work as expected.
+
 
 ## Getting Started
 
-There is no setup process:
+There is no setup process. Under-the-hood `puddles` uses the `concurrent.futures` multiprocessing library.
+
+To run a function on another process use `puddles.run(func, *a, **kw)`
 
 ```py
 import puddles
 
 def process_func():
-    """Same as `raw.run(extras.sync_sleep, 3)`"""
     print('Process execution')
     puddles.extras.sync_sleep(3) # not async.
     return 'egg'
@@ -25,20 +80,28 @@ results = puddles.run(process_func)
 # ('egg',)
 ```
 
-It runs `async` functions with minimal changes:
+`puddles` runs async functions automatically `puddles.run(async_func(*a, **kw))`:
 
 ```py
 import puddles
 
 async def async_process_func(timeout=3):
-    """Same as `raw.run(extras.async_sleep, 3)`"""
     print('Async Process execution')
     await puddles.extras.async_sleep(timeout) # is async.
     return timeout
 
+results = puddles.run(async_process_func)
+# (3, )
+```
+
+To run many functions, provide a `tuple` of callables. Both async and none-async will run:
+
+```py
+import puddles
+
 functions = (
         process_func,   # from the above example
-        async_process_func,
+        async_process_func, # also from above.
     )
 
 results = puddles.run(functions)
