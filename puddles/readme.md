@@ -19,20 +19,23 @@ Job done. All dependencies are built-ins.
 import puddles
 from puddles import raw, extras
 
+def main():
+    # For fun, generate the same function signatures for sync and async
+    items = generate_function_pack(async_sleep)
+    items += generate_function_pack(sync_sleep)
 
-def sync_sleep(index=-1, **other):
-    print('sync_sleep', 'index:', index, 'options:', other)
-    time.sleep(extras.variate(3, .5))
-    return index
+    assert len(items) == 10
 
-
-async def async_sleep(index=-1, **other):
-    print('async_sleep', 'index:', index, 'options:', other)
-    await asyncio.sleep(extras.variate(3, .5))
-    return index
+    # Run them all...
+    result = puddles.run(items, wait_futures=True)
+    # blocking for ~4 seconds because wait_futures=True.
+    print(result)
+    # (4, -1, 4, '5/6', 2, 3, '5/6', -1, 2, '5/6', '5/6', 3)
 
 
 def generate_function_pack(func):
+    """Return a tuple containing mixed types; (func, tuple, puddles.Options,)
+    """
     items = (
                 # # Function
                 func,
@@ -47,16 +50,18 @@ def generate_function_pack(func):
         )
     return items
 
-# For fun, generate the same function signatures for sync and async
-items = generate_function_pack(async_sleep)
-items += generate_function_pack(sync_sleep)
 
-len(items) == 10
+def sync_sleep(index=-1, **other):
+    print('sync_sleep', 'index:', index, 'options:', other)
+    time.sleep(extras.variate(3, .5))
+    return index
 
-# Run them all...
-result = puddles.run(items)
-print(result)
-# (4, -1, 4, '5/6', 2, 3, '5/6', -1, 2, '5/6', '5/6', 3)
+
+async def async_sleep(index=-1, **other):
+    print('async_sleep', 'index:', index, 'options:', other)
+    await asyncio.sleep(extras.variate(3, .5))
+    return index
+
 ```
 
 And you're good to go. As all `items` standard Futures, all builtins and functionality should work as expected.
@@ -111,7 +116,7 @@ results = puddles.run(functions)
 
 ## Args and Kwargs
 
-Provide arguments to the immediate executor:
+You can provide _args_ and _kwargs_ arguments to the immediate `puddles.run(func, *a, **kw)` executor:
 
 ```py
 import puddles
@@ -125,7 +130,10 @@ puddles.run(process_func, 3)
 # (3,)
 ```
 
-For multiple functions, provide a tuple of tuples:
+To provide alternative arguments for each call, provide a tuple of tuples. Each
+sub item contains `(func, args, kwargs)`.
+
+The args must be iterable, and the kwargs is a `dict`:
 
 ```py
 import puddles
@@ -292,7 +300,9 @@ puddle.run(items)
 
 # Process Head
 
-Puddle applies a "head" for the execution of each new process. The head accepts all the arguments given to the new process and is designed offset the hard-parts of running a function. This includes detecting async routines and special parameters.
+Puddle introduced the concept of a "head" for the execution of each new process.
+
+The head accepts all the arguments given to the new process and is designed offset the hard-parts of running a function. This includes detecting async routines and special parameters.
 
 The package silently applies a caller function `puddles.raw.primary_head_main(func, *a, **kw)` of which runs a new `puddles.head.ProcessHead` to run your code.
 
@@ -335,7 +345,9 @@ The ProcessHead or generally a _head class_ is the unit owning the execution of 
 
 By default a `puddles.head.InfoHead` (or child) will run the code. This is generated through the `head_caller`. The class instance runs within the new process.
 
-A new `head_class` can be supplied to alter the default. Note we can provide a string here or a class
+### Custom `ProcessHead`
+
+A new `head_class` can be supplied to alter the default. You can provide a string or a class:
 
 
 ```py
@@ -346,12 +358,13 @@ def func(*a, **kw):
 
 
 packs = (
-        func,
-        puddles.count(12, func),
+        func, # one item
+        puddles.count(12, func), # 12 more of the same.
     )
 
 
 class CustomHead(puddles.head.InfoHead):
+    """A custom head to replace the existing..."""
 
     def setup(self):
         """A hook for process starts"""
@@ -370,4 +383,67 @@ puddles.raw.submit(
     # 'accepting' func to offload execution.
     head_class=CustomHead,
 )
+```
+
+The `CustomHead` is the first thing to run on a new process.
+
+
+#### How Does It Work?
+
+The base functionality is easy to replicate (obviously `puddles` provides a few extra conveniences :heart:)
+
+```py
+import asyncio
+from inspect import iscoroutinefunction
+
+import puddles
+
+
+def process_func(task_func, *args, **kwargs):
+    head = ExamplePseudoHead(task_func, *args, **kwargs)
+    head.setup()
+    result = head.live()
+    return result
+
+
+class ExamplePseudoHead(object):
+    """A custom head to replace the existing..."""
+
+    def setup(self):
+        """A hook for process starts"""
+        print('New Process', self.kwargs)
+
+    def live(self):
+        if iscoroutinefunction(self.func):
+            return asyncio.run(func(*self.args, **self.kwargs))
+        return self.func(*self.args, **self.kwargs)
+```
+
+You _could_ write all this yourself; And apply caveats for key mapping and cancellations - but why bother when `puddles.head.ProcessHead` is free.
+
+
+# Extras
+
+There are some extra tools to help you work with processes.
+
+
+## CPU Affinity `puddles.cpu.set_cores`
+
+> Windows
+
+You can set which CPU core of a process, given the many cores within a single CPU.
+
+For example, if you have 8 CPU cores, you can _which_ cores to use with this process:
+
+### Function
+
+Call `puddles.cpu.set_cores([2,3])` the within the task function:
+
+```py
+import puddles
+
+async def core_setter():
+    puddles.cpu.set_cores([3,5])
+
+puddles.run(core_setter)
 ```
