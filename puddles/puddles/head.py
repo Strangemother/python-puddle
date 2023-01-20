@@ -24,6 +24,7 @@ class ProcessHead(object):
         self.func = func
         self.args = a
         self.kwargs = kw
+
         self._livemap = {}
 
     def setup(self):
@@ -36,9 +37,16 @@ class ProcessHead(object):
     def live(self, *a, **kw):
         """The first live head"""
         try:
+            self.prepare_live()
             return self.run_func(*a, **kw)
         except KeyboardInterrupt:
             print('Head Kill', a, kw)
+
+    def prepare_live(self):
+        new_kw, proc_kw = self.split_magic_kwargs()
+        print('prepare_live', self.kwargs)
+        self.kwargs = new_kw
+        self.head_kwargs = proc_kw
 
 
     # @cached_property
@@ -84,6 +92,21 @@ class ProcessHead(object):
             run_kwargs.pop(key, None)
         kw.update(run_kwargs)
         return kw
+
+    def split_magic_kwargs(self):
+        # anything starting with __head_kwarg_
+        keep = {}
+        alt = {}
+        needle = '__head_kwarg_'
+
+        for k, v in self.kwargs.items():
+            if k.startswith(needle):
+                # pluck.
+                keep[k[len(needle):]] = v
+            else:
+                alt[k] = v
+
+        return alt, keep
 
     def run_func(self, *a, **kw):
         func, fargs, fkwargs = self.get_callable(*a, **kw)

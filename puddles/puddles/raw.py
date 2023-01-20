@@ -193,6 +193,7 @@ class Extendables(Options):
     def __init__(self, func, **kw):
         self.done_callbacks = ()
         self.run_kwargs = {}
+        self.head_kwargs = {}
         self.run_args = ()
 
         super().__init__(func, **kw)
@@ -204,7 +205,13 @@ class Extendables(Options):
     def pre_process_kw(self, kw):
         kw = super().pre_process_kw(kw)
         kw.update(self.run_kwargs)
+        kw.update(self.head_kwargs)
+        # print('Extendables prepared', kw)
         return kw
+
+    def cores(self, *indices):
+        self.head_kwargs.setdefault('__head_kwarg_cores', indices)
+        return self
 
     def get_future_func(self):
         return self.func
