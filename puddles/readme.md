@@ -300,7 +300,7 @@ puddle.run(items)
 
 # Process Head
 
-Puddle introduced the concept of a "head" for the execution of each new process.
+Puddle introduces the concept of a "head" for the execution of each new process.
 
 The head accepts all the arguments given to the new process and is designed offset the hard-parts of running a function. This includes detecting async routines and special parameters.
 
